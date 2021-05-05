@@ -9,6 +9,9 @@
 # PURPOSE:
 #           This Mojolicious Lite App is used to demonstrate a 
 #           chat application using websockets.
+#           --
+#           You need to install DateTime perl module which is
+#           used to display a region's time.
 #
 # USAGE: 
 #       morbo simpleChatApp
