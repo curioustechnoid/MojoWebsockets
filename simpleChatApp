@@ -20,7 +20,7 @@
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
 use Mojolicious::Lite -signatures;
-use DateTime;
+use POSIX qw(strftime); #Added Cheng: 06Sep2019 -> Getting the date format was getting painful so using this
 
 
 # Global variable to hold the users connected to the websocket
@@ -50,7 +50,7 @@ websocket '/websocket' => sub {
        my ($self, $param) = @_;
 
        # Getting the time to display next to chat message
-       my $dt = DateTime->now( time_zone => 'Asia/Dubai');
+       my $dt = strftime "%H:%M:%S", localtime; #format HH:MI:SS
 
        # Extracting the message sent by user
        my ($name,$msg) = split /\|/,$param;
@@ -61,7 +61,7 @@ websocket '/websocket' => sub {
 
 
            $users->{$_}->send({json => {
-               time     => $dt->hour.':'.$dt->minute.':'.$dt->second,
+               time     => $dt,
                name     => $name,
                chatmsg  => $msg
            }});
