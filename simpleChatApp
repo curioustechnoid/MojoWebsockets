@@ -1,0 +1,190 @@
+#!/usr/bin/env perl
+#
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# simpleChatApp
+#
+# AUTHOR:  Curious Technoid
+# DATE:  05-May-2021
+# VERSION:  1.0
+# PURPOSE:
+#           This Mojolicious Lite App is used to demonstrate a 
+#           chat application using websockets.
+#
+# USAGE: 
+#       morbo simpleChatApp
+#       hypnotoad simpleChatApp
+#
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+use Mojolicious::Lite -signatures;
+use DateTime;
+
+
+# Global variable to hold the users connected to the websocket
+my $users = {};
+
+
+# Handling the routes to render the chat window
+get '/' => 'index';
+
+# Handling websocket requests
+websocket '/websocket' => sub {
+
+    my $self = shift;
+
+    # Disconnect the users if no activity for 5 mins
+    $self->inactivity_timeout(300);
+    app->log->debug(sprintf 'Client connected: %s', $self->tx);
+
+    # Storing the client information in the hash to broadcast any new message
+    my $id = sprintf "%s", $self->tx;
+    $users->{$id} = $self->tx;
+
+
+    # Whenever a new message is received by any user, broadcast to all connected users
+    $self->on(message => sub {
+
+       my ($self, $param) = @_;
+
+       # Getting the time to display next to chat message
+       my $dt = DateTime->now( time_zone => 'Asia/Dubai');
+
+       # Extracting the message sent by user
+       my ($name,$msg) = split /\|/,$param;
+
+       # Send latest message by any user to all connected users along with the time
+       app->log->debug("Sending message to all clients");
+       for (keys %$users) {
+
+
+           $users->{$_}->send({json => {
+               time     => $dt->hour.':'.$dt->minute.':'.$dt->second,
+               name     => $name,
+               chatmsg  => $msg
+           }});
+    }
+
+
+    });
+
+    # When the timeout occurs or the users disconnects (by closing the browser),
+    # delete the user from the hash of connected of users
+    $self->on(finish => sub {
+
+        app->log->debug('Client disconnected');
+        delete $users->{$id};
+
+    });
+
+};
+
+
+app->start;
+
+__DATA__
+@@ index.html.ep
+<html>
+  <head>
+    <title>Curious Technoid Websockets Demo</title>
+    <style type="text/css">
+      textarea {
+          width: 40em;
+          height:100em;
+      }
+
+    </style>
+  </head>
+<body>
+
+<h1>Curious Technoid Chat Group</h1>
+
+
+<div id="welcome"></div>
+
+<input type="hidden" id="namenew" placeholder="Name" />
+
+<form onSubmit="return connectToChat()">
+    <div id="connectbtn">
+    <input type="text" id="name" placeholder="Enter your name" />
+    <input id="submit" type="submit" value="Connect">
+    </div>
+</form>
+
+
+<form name="sendform" onSubmit="return sendMsg()">
+    <div id="sendMsgbtn">
+    <input type="text" id="msg" placeholder="Message" />
+    <input id="submit2" type="submit" value="Send">
+    </div>
+</form>
+
+
+<textarea id="chatwindow" readonly></textarea>
+
+
+<script>
+
+var ws;
+
+// Keeping the send message button disabled to start with.
+var x = document.getElementById("sendMsgbtn");
+x.style.display = "none";
+
+// Connect to websocket
+function connectToChat() {
+
+    ws = new WebSocket('<%= url_for('websocket')->to_abs %>');
+
+    // Show a message to the user when connected
+    ws.onopen = function (event) {
+
+        document.getElementById("chatwindow").innerHTML = "Client Connected\n";
+
+    };
+
+    // If connection to websocket is closed, then show message to the user
+    ws.onclose = function() { 
+        // websocket is closed.
+        document.getElementById("chatwindow").innerHTML += "Connection Closed due to inactivity\n";
+        alert("Connection is closed."); 
+    };
+
+    // Parse the incoming message and display it appropriately
+    ws.onmessage = function (event) {
+
+        var res = JSON.parse(event.data);
+
+        // display the message in the chatwindow text area
+        document.getElementById("chatwindow").innerHTML += res.name + ' [' + res.time + ']: ' + res.chatmsg + "\n";
+
+    };
+
+    // Always show the name once connected
+    var name= document.getElementById("name").value;
+    document.getElementById("connectbtn").innerHTML = "";
+    document.getElementById("welcome").innerHTML = "<h2><font color=blue>Hello " + name + "</font></h2>";
+    document.getElementById("namenew").value = name;
+    document.getElementById("sendMsgbtn").style.display = "block";
+
+
+
+    return false; // stop further bubbling of event
+}
+
+
+
+// Whenever send message button is pressed, send it to websocket along with name.
+function sendMsg(){
+
+    // console.log("** cheng: " + document.getElementById("msg").value);
+    ws.send(document.getElementById("namenew").value + '|' + document.getElementById("msg").value);
+    document.getElementById("msg").value = "";
+
+    return false; // stop further bubbling of event
+}
+
+
+</script>
+
+</body>
+</html>
