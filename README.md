@@ -11,4 +11,5 @@ Ensure the below perl modules are installed:
 Once the above perl modules are installed you can just run this script using any of the below commands:
 
 `morbo simpleChatApp`
+
 `hypnotoad simpleChatApp`
